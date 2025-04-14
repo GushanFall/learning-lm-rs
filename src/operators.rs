@@ -71,25 +71,79 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    // todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    // 检查纬度是否匹配
+    let len = y.size();
+    assert!(len == x.size());
+
+    let n = w.size();
+    assert!(len % n == 0);
+
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
+    let _w = w.data();
+
+    // 每 n 维向量为一组
+    for i in 0..len/n {
+        // 计算 rms
+        let mut sum = 0.0;
+        for j in 0..n {
+            sum += _x[i * n + j] * _x[i * n + j];
+        }
+        let rms = (sum / n as f32 + epsilon).sqrt();
+        for j in 0..n {
+            _y[i * n + j] = _w[j] * _x[i * n + j] / rms;
+        }
+    }
 }
 
 // y = silu(x) * y
 // hint: this is an element-wise operation
 pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
-    // let len = y.size();
-    // assert!(len == x.size());
+    let len = y.size();
+    assert!(len == x.size());
 
-    // let _y = unsafe { y.data_mut() };
-    // let _x = x.data();
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
 
-    todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+    // todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+
+    for i in 0..len {
+        let sigmoid_x = 1.0 / (1.0 + (-_x[i]).exp());
+        _y[i] = _y[i] * _x[i] * sigmoid_x;
+    }
 }
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
+// 不显式转置是直接改变索引的顺序来实现转置
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
-    todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
+    // todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
+    // 检查纬度是否匹配
+    let a_shape = a.shape();
+    let b_shape = b.shape();
+    let c_shape = c.shape();
+    assert!(a_shape.len() > 1);
+    assert!(b_shape.len() > 1);
+    assert!(c_shape.len() > 1);
+    assert!(a_shape[1] == b_shape[1]);
+    assert!(c_shape[0] == a_shape[0]);
+    assert!(c_shape[1] == b_shape[0]);
+
+    let _a = a.data();
+    let _b = b.data();
+    let mut _c = unsafe { c.data_mut() };
+
+    // A @ B^T
+    for i in 0..a_shape[0] {
+        for j in 0..b_shape[0] {
+            let mut sum = 0.0;
+            for k in 0..a_shape[1] {
+                sum += _a[i * a_shape[1] + k] * _b[j * b_shape[1] + k];
+            }
+            _c[i * b_shape[0] + j] = alpha * sum + beta * _c[i * b_shape[0] + j];
+        }
+    }
 }
 
 // Dot product of two tensors (treated as vectors)
